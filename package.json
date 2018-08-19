@@ -1,0 +1,16 @@
+{
+  "name": "opencrypto-data-explorer",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "build": "parcel build src/index.html -d docs",
+    "watch": "parcel src/index.html -d docs"
+  },
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "node-sass": "^4.9.3",
+    "parcel": "^1.9.7"
+  }
+}
