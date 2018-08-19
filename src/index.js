@@ -1,18 +1,74 @@
 
 var hideEmpty = true
+var webIds = null
+var path = null
 
 function getLengthInBytes(str) {
   var b = str.match(/[^\x00-\xff]/g);
   return (str.length + (!b ? 0: b.length)); 
 }
 
+function githubIssueLink (path, value) {
+  const title = encodeURI(`(${dataItem.id}) ${makePath(path)}`)
+  const body = `Current value: \`${value}\``
+  return `https://github.com/opencrypto-io/data/issues/new?labels=bug&title=${title}&body=${body}`
+}
+
+function setPath (p) {
+  if (!p) {
+    return null
+  }
+  path = p
+}
+
+function makeFooter (arr, schema) {
+  return makePath(arr) + ' <'+schema.type+(schema.format? ':' + schema.format : '')+'>'
+}
+
+function makePath (arr, schema) {
+  return arr.reduce((out, v) => {
+    if (typeof v === 'number') {
+      return out + '['+v+']'
+    }
+    if (typeof v === 'string' && !v.match(/^[a-zA-Z0-9_]+$/)) {
+      return out + '[\''+v+'\']'
+    }
+    return out + '.' + v
+  })
+}
+
+function unsetPath () {
+  path = null
+}
+
+function resolveWebId(val, type) {
+  if (type.match(/^custom\//)) {
+    return m('a', { href: val }, val)
+  }
+  const wd = webIds[type]
+  if (!wd) {
+    return '#'
+  }
+  const href = webIds[type].url.replace('@id', val)
+  return m('a', { href, target: '_blank' }, val)
+}
+
 function processItem(i) {
   i._size = getLengthInBytes(JSON.stringify(i))
   i._progress = Math.random()
   i._logo = null
-  var asset0 = i.assets[0]
-  if (asset0.images && asset0.images.logo_square) {
-    i._logo = asset0.images.logo_square.data
+  i._logo_full = null
+  for(let n = 0; n <= 3; n++) {
+    var asset0 = i.assets[n]
+    if (i._logo) continue
+    if (!asset0) continue
+    if (asset0.images && asset0.images.logo_square) {
+      i._logo = asset0.images.logo_square.data
+      i._logo_full = i._logo
+    }
+    if (asset0.images && asset0.images.logo_full) {
+      i._logo_full = asset0.images.logo_full.data
+    }
   }
   return i
 }
@@ -47,7 +103,7 @@ function OCBoolean (schema, val) {
   return val === true ? 'Yes' : (val === false ? 'No' : zeroValue())
 }
 
-function OCString (schema, val) {
+function OCString (schema, val, path) {
   if (!val) {
     return zeroValue()
   }
@@ -56,32 +112,42 @@ function OCString (schema, val) {
       m('img', { src: 'data:image/svg+xml;base64,' + val, style: 'max-height: 100px;' }) 
     ])
   }
+  let out = val
   if (schema.format === 'url') {
-    return m('a', { href: val, target: '_blank' }, val)
+    out = m('a', { href: val, target: '_blank' }, val)
   }
-  return val
+  else if (schema.format === 'date') {
+    out = `${val} (${moment(val).fromNow()})`
+  }
+  else if (schema.format == 'webid') {
+    out = resolveWebId(val, path.slice(-1)[0])
+  }
+  return m('div', [
+    out,
+    m('.control', m('a', { href: githubIssueLink(path, val) }, m('i.fas.fa-bug')))
+  ])
 }
 
 function OCNumber (schema, val) {
   return val || zeroValue()
 }
 
-function OCArray (schema, val) {
+function OCArray (schema, val, path) {
   if (!val || val.length === 0) {
     return zeroValue()
   }
   let fn = getType(schema.items.type)
-  return val.map(i => {
-    return fn ? fn(schema.items, i) : null
+  return val.map((i, c) => {
+    return fn ? fn(schema.items, i, path.concat([c])) : null
   })
 }
 
-function OCObject(schema, values) {
+function OCObject(schema, values, path) {
   if (schema.patternProperties) {
     if (values) {
       schema.properties = []
       Object.keys(values).forEach(k => {
-        schema.properties[k] = { type: 'string' }
+        schema.properties[k] = { type: 'string', format: schema['opencrypto-validation'] }
       })
     } else {
       return zeroValue()
@@ -95,10 +161,12 @@ function OCObject(schema, values) {
       return null
     }
     const pdata = schema.properties[p]
+    let cpath = path.concat([p])
     let fn = getType(pdata.type)
-    return m('tr', [
+    let events = { 'data-path': makeFooter(cpath, pdata), onmouseenter: m.withAttr('data-path', setPath), onmouseleave: m.withAttr('data-path', unsetPath) }
+    return m('tr', events, [
       m('th', pdata.title || p),
-      m('td', fn ? fn(pdata, values ? values[p] : null) : 'unknown type: '+pdata.type)
+      m('td', fn ? fn(pdata, values ? values[p] : null, cpath) : 'unknown type: '+pdata.type)
     ])
   })))
 }
@@ -108,35 +176,43 @@ function githubLink(id, type = 'blob') {
 }
 
 const Layout = {
+  oninit () {
+    ocd.query('webids').then((res) => {
+      webIds = res
+    })
+  },
   view (vnode) {
-    return m('div', { 'style': 'padding-bottom: 5em;' },  [
-      m('nav#navbar.navbar', [
-        m('.container', [
-          m('.navbar-brand', [
-            m('a.navbar-item', { href: 'https://data.opencrypto.io/' }, [
-              m('#logo'),
-              m('#logo-text', [
-                m('span.thin', 'Open'),
-                'Crypto',
-                m('span.green', 'Data'),
+    return m('div', [
+      path ? m('#toolsFooter', path) : '',
+      m('div', { 'style': 'padding-bottom: 5em;' },  [
+        m('nav#navbar.navbar', [
+          m('.container', [
+            m('.navbar-brand', [
+              m('a.navbar-item', { href: 'https://data.opencrypto.io/' }, [
+                m('#logo'),
+                m('#logo-text', [
+                  m('span.thin', 'Open'),
+                  'Crypto',
+                  m('span.green', 'Data'),
+                ])
+              ])
+            ]),
+            m('.navbar-menu', [
+              m('.navbar-start', [
+                m('a.navbar-item', { href: 'https://data.opencrypto.io' }, 'Homepage'), 
+                m('a.navbar-item.current', { href: 'https://explorer.opencrypto.io' }, 'Explorer'), 
+                m('a.navbar-item', { href: 'https://schema.opencrypto.io' }, 'Schema'), 
+              ]),
+              m('.navbar-end', [
+                m('a.navbar-item', { href: '#' }, 'How to contribute?'), 
+                m('a.navbar-item', { href: '#' }, 'FAQ'), 
               ])
             ])
-          ]),
-          m('.navbar-menu', [
-            m('.navbar-start', [
-              m('a.navbar-item', { href: 'https://data.opencrypto.io' }, 'Homepage'), 
-              m('a.navbar-item.current', { href: 'https://explorer.opencrypto.io' }, 'Explorer'), 
-              m('a.navbar-item', { href: 'https://schema.opencrypto.io' }, 'Schema'), 
-            ]),
-            m('.navbar-end', [
-              m('a.navbar-item', { href: '#' }, 'How to contribute?'), 
-              m('a.navbar-item', { href: '#' }, 'FAQ'), 
-            ])
           ])
+        ]),
+        m('.container', [
+          m('#page', vnode.children)
         ])
-      ]),
-      m('.container', [
-        m('#page', vnode.children)
       ])
     ])
   }
@@ -280,7 +356,7 @@ const Project = {
         m('.navbar.transparent', [
           m('.navbar-menu', [
             m('.navbar-start', [
-              p._logo ? m('.navbar-item', m('.itemLogo', m('img', { src: 'data:image/svg+xml;base64,' + p._logo }))) : '',
+              p._logo_full ? m('.navbar-item', m('.itemLogo', m('img', { src: 'data:image/svg+xml;base64,' + p._logo_full }))) : '',
               m('.navbar-item', m('h3.title.is-4', p.name))
             ]),
             m('.navbar-end', [
@@ -307,9 +383,9 @@ const Project = {
           if (projectSchema === null) {
             return m('div', { style: 'padding: 2em;' }, 'Loading ..')
           }
-          return m('#dataTable', OCObject(projectSchema, p))
+          return m('#dataTable', OCObject(projectSchema, p, []))
         }()
-      ])
+      ]),
     ])
   }
 }

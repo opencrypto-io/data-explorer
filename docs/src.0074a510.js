@@ -106,19 +106,75 @@ parcelRequire = (function (modules, cache, entry, globalName) {
 })({"index.js":[function(require,module,exports) {
 
 var hideEmpty = true;
+var webIds = null;
+var path = null;
 
 function getLengthInBytes(str) {
   var b = str.match(/[^\x00-\xff]/g);
   return str.length + (!b ? 0 : b.length);
 }
 
+function githubIssueLink(path, value) {
+  var title = encodeURI('(' + dataItem.id + ') ' + makePath(path));
+  var body = 'Current value: `' + value + '`';
+  return 'https://github.com/opencrypto-io/data/issues/new?labels=bug&title=' + title + '&body=' + body;
+}
+
+function setPath(p) {
+  if (!p) {
+    return null;
+  }
+  path = p;
+}
+
+function makeFooter(arr, schema) {
+  return makePath(arr) + ' <' + schema.type + (schema.format ? ':' + schema.format : '') + '>';
+}
+
+function makePath(arr, schema) {
+  return arr.reduce(function (out, v) {
+    if (typeof v === 'number') {
+      return out + '[' + v + ']';
+    }
+    if (typeof v === 'string' && !v.match(/^[a-zA-Z0-9_]+$/)) {
+      return out + '[\'' + v + '\']';
+    }
+    return out + '.' + v;
+  });
+}
+
+function unsetPath() {
+  path = null;
+}
+
+function resolveWebId(val, type) {
+  if (type.match(/^custom\//)) {
+    return m('a', { href: val }, val);
+  }
+  var wd = webIds[type];
+  if (!wd) {
+    return '#';
+  }
+  var href = webIds[type].url.replace('@id', val);
+  return m('a', { href: href, target: '_blank' }, val);
+}
+
 function processItem(i) {
   i._size = getLengthInBytes(JSON.stringify(i));
   i._progress = Math.random();
   i._logo = null;
-  var asset0 = i.assets[0];
-  if (asset0.images && asset0.images.logo_square) {
-    i._logo = asset0.images.logo_square.data;
+  i._logo_full = null;
+  for (var n = 0; n <= 3; n++) {
+    var asset0 = i.assets[n];
+    if (i._logo) continue;
+    if (!asset0) continue;
+    if (asset0.images && asset0.images.logo_square) {
+      i._logo = asset0.images.logo_square.data;
+      i._logo_full = i._logo;
+    }
+    if (asset0.images && asset0.images.logo_full) {
+      i._logo_full = asset0.images.logo_full.data;
+    }
   }
   return i;
 }
@@ -153,39 +209,44 @@ function OCBoolean(schema, val) {
   return val === true ? 'Yes' : val === false ? 'No' : zeroValue();
 }
 
-function OCString(schema, val) {
+function OCString(schema, val, path) {
   if (!val) {
     return zeroValue();
   }
   if (schema.media && schema.media.binaryEncoding == 'base64') {
     return m('div', [m('img', { src: 'data:image/svg+xml;base64,' + val, style: 'max-height: 100px;' })]);
   }
+  var out = val;
   if (schema.format === 'url') {
-    return m('a', { href: val, target: '_blank' }, val);
+    out = m('a', { href: val, target: '_blank' }, val);
+  } else if (schema.format === 'date') {
+    out = val + ' (' + moment(val).fromNow() + ')';
+  } else if (schema.format == 'webid') {
+    out = resolveWebId(val, path.slice(-1)[0]);
   }
-  return val;
+  return m('div', [out, m('.control', m('a', { href: githubIssueLink(path, val) }, m('i.fas.fa-bug')))]);
 }
 
 function OCNumber(schema, val) {
   return val || zeroValue();
 }
 
-function OCArray(schema, val) {
+function OCArray(schema, val, path) {
   if (!val || val.length === 0) {
     return zeroValue();
   }
   var fn = getType(schema.items.type);
-  return val.map(function (i) {
-    return fn ? fn(schema.items, i) : null;
+  return val.map(function (i, c) {
+    return fn ? fn(schema.items, i, path.concat([c])) : null;
   });
 }
 
-function OCObject(schema, values) {
+function OCObject(schema, values, path) {
   if (schema.patternProperties) {
     if (values) {
       schema.properties = [];
       Object.keys(values).forEach(function (k) {
-        schema.properties[k] = { type: 'string' };
+        schema.properties[k] = { type: 'string', format: schema['opencrypto-validation'] };
       });
     } else {
       return zeroValue();
@@ -199,8 +260,10 @@ function OCObject(schema, values) {
       return null;
     }
     var pdata = schema.properties[p];
+    var cpath = path.concat([p]);
     var fn = getType(pdata.type);
-    return m('tr', [m('th', pdata.title || p), m('td', fn ? fn(pdata, values ? values[p] : null) : 'unknown type: ' + pdata.type)]);
+    var events = { 'data-path': makeFooter(cpath, pdata), onmouseenter: m.withAttr('data-path', setPath), onmouseleave: m.withAttr('data-path', unsetPath) };
+    return m('tr', events, [m('th', pdata.title || p), m('td', fn ? fn(pdata, values ? values[p] : null, cpath) : 'unknown type: ' + pdata.type)]);
   })));
 }
 
@@ -211,8 +274,13 @@ function githubLink(id) {
 }
 
 var Layout = {
+  oninit: function oninit() {
+    ocd.query('webids').then(function (res) {
+      webIds = res;
+    });
+  },
   view: function view(vnode) {
-    return m('div', { 'style': 'padding-bottom: 5em;' }, [m('nav#navbar.navbar', [m('.container', [m('.navbar-brand', [m('a.navbar-item', { href: 'https://data.opencrypto.io/' }, [m('#logo'), m('#logo-text', [m('span.thin', 'Open'), 'Crypto', m('span.green', 'Data')])])]), m('.navbar-menu', [m('.navbar-start', [m('a.navbar-item', { href: 'https://data.opencrypto.io' }, 'Homepage'), m('a.navbar-item.current', { href: 'https://explorer.opencrypto.io' }, 'Explorer'), m('a.navbar-item', { href: 'https://schema.opencrypto.io' }, 'Schema')]), m('.navbar-end', [m('a.navbar-item', { href: '#' }, 'How to contribute?'), m('a.navbar-item', { href: '#' }, 'FAQ')])])])]), m('.container', [m('#page', vnode.children)])]);
+    return m('div', [path ? m('#toolsFooter', path) : '', m('div', { 'style': 'padding-bottom: 5em;' }, [m('nav#navbar.navbar', [m('.container', [m('.navbar-brand', [m('a.navbar-item', { href: 'https://data.opencrypto.io/' }, [m('#logo'), m('#logo-text', [m('span.thin', 'Open'), 'Crypto', m('span.green', 'Data')])])]), m('.navbar-menu', [m('.navbar-start', [m('a.navbar-item', { href: 'https://data.opencrypto.io' }, 'Homepage'), m('a.navbar-item.current', { href: 'https://explorer.opencrypto.io' }, 'Explorer'), m('a.navbar-item', { href: 'https://schema.opencrypto.io' }, 'Schema')]), m('.navbar-end', [m('a.navbar-item', { href: '#' }, 'How to contribute?'), m('a.navbar-item', { href: '#' }, 'FAQ')])])])]), m('.container', [m('#page', vnode.children)])])]);
   }
 };
 
@@ -299,7 +367,7 @@ var Project = {
       dataView = type;
     }
 
-    return m('div', [m('h2.title.is-4', [m('a', { href: '/', oncreate: m.route.link }, 'Projects'), ' / ', m('span', p.name)]), m('#itemDetail', [m('.navbar.transparent', [m('.navbar-menu', [m('.navbar-start', [p._logo ? m('.navbar-item', m('.itemLogo', m('img', { src: 'data:image/svg+xml;base64,' + p._logo }))) : '', m('.navbar-item', m('h3.title.is-4', p.name))]), m('.navbar-end', [m('a.navbar-item', { href: githubLink(p.id, 'edit') }, [m('i.fab.fa-github', { style: 'font-size: 1.3em; padding-right: 0.3em;' }), 'Edit on GitHub']), m('.navbar-item', [m('.buttons.has-addons', [m('span.button', { class: dataView === 'explorer' ? 'is-success is-selected' : '', onclick: m.withAttr('value', switchSource), value: 'explorer' }, 'Explorer'), m('span.button', { class: dataView === 'source' ? 'is-success is-selected' : '', onclick: m.withAttr('value', switchSource), value: 'source' }, 'Source')])])])])]), function () {
+    return m('div', [m('h2.title.is-4', [m('a', { href: '/', oncreate: m.route.link }, 'Projects'), ' / ', m('span', p.name)]), m('#itemDetail', [m('.navbar.transparent', [m('.navbar-menu', [m('.navbar-start', [p._logo_full ? m('.navbar-item', m('.itemLogo', m('img', { src: 'data:image/svg+xml;base64,' + p._logo_full }))) : '', m('.navbar-item', m('h3.title.is-4', p.name))]), m('.navbar-end', [m('a.navbar-item', { href: githubLink(p.id, 'edit') }, [m('i.fab.fa-github', { style: 'font-size: 1.3em; padding-right: 0.3em;' }), 'Edit on GitHub']), m('.navbar-item', [m('.buttons.has-addons', [m('span.button', { class: dataView === 'explorer' ? 'is-success is-selected' : '', onclick: m.withAttr('value', switchSource), value: 'explorer' }, 'Explorer'), m('span.button', { class: dataView === 'source' ? 'is-success is-selected' : '', onclick: m.withAttr('value', switchSource), value: 'source' }, 'Source')])])])])]), function () {
       if (dataView === 'source') {
         var src = JSON.stringify(p, null, 2);
         return m('#itemSource', [m('pre', m.trust(hljs.highlight('json', src).value))]);
@@ -307,7 +375,7 @@ var Project = {
       if (projectSchema === null) {
         return m('div', { style: 'padding: 2em;' }, 'Loading ..');
       }
-      return m('#dataTable', OCObject(projectSchema, p));
+      return m('#dataTable', OCObject(projectSchema, p, []));
     }()])]);
   }
 };

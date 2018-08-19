@@ -31,11 +31,12 @@ a.navbar-item:hover, a:hover {
 }
 
 #itemDetail .itemLogo {
-  width: 48px;
+  max-width: 150px;
+  max-height: 25px;
 }
 #itemDetail .itemLogo img {
-  max-width: 48px;
-  max-height: 48px;
+  max-width: 150px;
+  max-height: 25px;
   display: block;
   margin: auto;
 }
@@ -64,7 +65,7 @@ a.navbar-item:hover, a:hover {
 }
 
 #dataTable th {
-  width: 20%;
+  width: 150px;
   background-color: #F8F8F8;
 }
 
@@ -72,15 +73,38 @@ a.navbar-item:hover, a:hover {
   word-wrap: break-word;
 }
 
+#dataTable td > div > .control {
+  display: none;
+}
+
+#dataTable td:hover > div > .control {
+  display: inline-block;
+  float: right;
+  font-size: 0.9em;
+  margin-left: 1em;
+}
+
+#dataTable .control {
+  cursor: pointer;
+}
+
+#dataTable table tbody td, #dataTable table tbody th {
+  border-color: #F2F2F2;
+}
+
+#dataTable table tbody tr:hover > td {
+  background-color: #EEFBEF;
+}
+
+#dataTable table tbody tr:hover > th {
+  background-color: #F2F2F2;
+}
+
 #projectList { 
   box-shadow: 0 1px 6px 0 rgba(33,27,27,0.2);
   background-color: #FFFFFF;
   border-radius: 4px;
   font-size: 0.9rem;
-}
-
-table { 
-  border-color: white !important;
 }
 
 #projectList table {
@@ -176,5 +200,17 @@ td.data-logo {
 
 input.searchInput:focus {
   outline-width: 0;
+}
+
+#toolsFooter {
+  position: fixed;
+  background-color: white;
+  bottom: 0px;
+  width: 100%;
+  height: 30px;
+  padding: 0.2em 0.5em;
+  font-size: 0.9em;
+  z-index: 1;
+  border-top: 1px solid #D1D1D1;
 }
 
