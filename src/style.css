@@ -71,13 +71,18 @@ a.navbar-item:hover, a:hover {
 
 #dataTable td {
   word-wrap: break-word;
+  padding: 1em;
+}
+
+#dataTable th {
+  padding: 1em;
 }
 
 #dataTable td > div > .control {
   display: none;
 }
 
-#dataTable td:hover > div > .control {
+#dataTable tr:hover > td > div > .control {
   display: inline-block;
   float: right;
   font-size: 0.9em;
@@ -93,11 +98,11 @@ a.navbar-item:hover, a:hover {
 }
 
 #dataTable table tbody tr:hover > td {
-  background-color: #EEFBEF;
+  /*background-color: #F2F2F2;*/
 }
 
 #dataTable table tbody tr:hover > th {
-  background-color: #F2F2F2;
+  background-color: #F0F0F0;
 }
 
 #projectList { 

@@ -2,6 +2,153 @@
 var hideEmpty = true
 var webIds = null
 var path = null
+var projectSchema = null
+
+const wcol = 'opencrypto-weight'
+const wcolif = 'opencrypto-weight-if'
+
+function fixSchema (schema) {
+  return schema
+
+  schema.properties.name[wcol] = 1
+  schema.properties.start_date[wcol] = 1
+  schema.properties.web[wcol] = 1
+  schema.properties.history[wcol] = 1
+  schema.properties.whitepapers[wcol] = 1
+  schema.properties.contacts[wcol] = 1
+  schema.properties.images[wcol] = 1
+  //schema.properties.images.properties.logo_square[wcol] = 1
+
+  schema.properties.team[wcol] = 1
+  schema.properties.team_url[wcol] = 0.5
+  schema.properties.team.items.properties.name[wcol] = 1
+  schema.properties.team.items.properties.role[wcol] = 1
+  schema.properties.team.items.properties.photo[wcol] = 0.5
+  schema.properties.team.items.properties.webids[wcol] = 1
+
+  schema.properties.assets[wcol] = 1
+  schema.properties.webids[wcol] = 1
+  //schema.properties.assets.items[wcol] = 2
+  schema.properties.assets.items.properties.start_date[wcol] = 1
+  schema.properties.assets.items.properties.type[wcol] = 1
+  schema.properties.assets.items.properties.symbol[wcol] = 1
+  schema.properties.assets.items.properties.name[wcol] = 1
+  schema.properties.assets.items.properties.denominations[wcol] = 1
+  schema.properties.assets.items.properties.token_properties[wcol] = 1
+  schema.properties.assets.items.properties.images[wcol] = 1
+  schema.properties.assets.items.properties.networks[wcol] = 1
+  schema.properties.assets.items.properties.networks[wcolif] = 'root.type === "blockchain"'
+
+  let network = schema.properties.assets.items.properties.networks.items
+  network.properties.name[wcol] = 5
+  network.properties.type[wcol] = 5
+  network.properties.proof_type[wcol] = 0.5
+  network.properties.proof_type[wcolif] = 'root.type === "main"'
+  network.properties.algorithm[wcol] = 1
+  network.properties.algorithm[wcolif] = 'root.type === "main"'
+  network.properties.target_block_time[wcol] = 1
+  network.properties.target_block_time[wcolif] = 'root.type === "main"'
+  network.properties.maximum_block_size[wcol] = 1
+  network.properties.maximum_block_size[wcolif] = 'root.type === "main"'
+  network.properties.mineable[wcol] = 1
+  network.properties.mineable[wcolif] = 'root.type === "main"'
+
+  return schema
+}
+
+function progressError(msgs, path, weight=1, text=undefined) {
+  msgs.push({
+    text,
+    path: makePath(path),
+    weight
+  })
+  return msgs
+}
+
+function checkWeightIf (schema) {
+}
+
+function calculateProgress (schema, obj, path=[], msgs=[], root=null) {
+  let w = 1
+  //console.log(schema.title)
+  switch (schema.type) {
+    case 'string':
+    case 'number':
+    case 'boolean':
+      if (schema[wcol]) {
+        if (schema[wcolif]) {
+          console.log('exception: %s, eval="%s"', makePath(path), schema[wcolif])
+          const ret = function test(code) {
+            return eval(code)
+          }(schema[wcolif])
+          if (!ret) {
+            w = 1
+            break
+          }
+        }
+        w = (obj !== undefined && obj !== null && obj !== '') ? schema[wcol] : 0
+        if (w === 0) {
+          progressError(msgs, path, schema[wcol])
+        }
+      }
+      break
+    case 'array':
+      if (schema[wcol] && schema.items) {
+        if (schema[wcolif]) {
+          console.log('exception: %s, eval="%s"', makePath(path), schema[wcolif])
+          const ret = function test(code) {
+            return eval(code)
+          }(schema[wcolif])
+          if (!ret) {
+            w = 1
+            break
+          }
+        }
+        if (obj) {
+          let arr = obj.map((i, k) => {
+            const [ prog ] = calculateProgress(schema.items, i, path.concat([k]), msgs, root)
+            return prog
+          })
+          w = _.sum(arr) / (arr.length * schema[wcol])
+        } else {
+          progressError(msgs, path, schema[wcol])
+          w = 0
+        }
+      }
+      break
+    case 'object':
+      if (schema.properties) {
+        if (schema[wcol] && schema[wcolif]) {
+          console.log('exception: %s, eval="%s"', makePath(path), schema[wcolif])
+          const ret = function test(code) {
+            return eval(code)
+          }(schema[wcolif])
+          if (!ret) {
+            w = 1
+            break
+          }
+        }
+        let weights = {}
+        let progress = {}
+        Object.keys(schema.properties).forEach(p => {
+          let pd = schema.properties[p]
+          if (pd[wcol]) {
+            weights[p] = pd[wcol]
+            const [ prog ] = calculateProgress(pd, obj[p] || '', path.concat([p]), msgs, obj)
+            progress[p] = prog
+          }
+        })
+        if (Object.keys(weights).length > 0) {
+          w = _.sum(Object.values(progress)) / _.sum(Object.values(weights))
+        }
+        if (w === 0) {
+          progressError(msgs, path, schema[wcol])
+        }
+      }
+      break
+  }
+  return [ w, msgs ]
+}
 
 function getLengthInBytes(str) {
   var b = str.match(/[^\x00-\xff]/g);
@@ -25,7 +172,7 @@ function makeFooter (arr, schema) {
   return makePath(arr) + ' <'+schema.type+(schema.format? ':' + schema.format : '')+'>'
 }
 
-function makePath (arr, schema) {
+function makePath (arr) {
   return arr.reduce((out, v) => {
     if (typeof v === 'number') {
       return out + '['+v+']'
@@ -55,9 +202,11 @@ function resolveWebId(val, type) {
 
 function processItem(i) {
   i._size = getLengthInBytes(JSON.stringify(i))
-  i._progress = Math.random()
   i._logo = null
   i._logo_full = null
+  const [ progress, msgs ] = calculateProgress(projectSchema, i)
+  console.log(i.id, progress, JSON.stringify(msgs, null, 2))
+  i._progress = progress
   for(let n = 0; n <= 3; n++) {
     var asset0 = i.assets[n]
     if (i._logo) continue
@@ -177,8 +326,16 @@ function githubLink(id, type = 'blob') {
 
 const Layout = {
   oninit () {
-    ocd.query('webids').then((res) => {
-      webIds = res
+    const schemaUrl = window.location.hostname === 'localhost' 
+      ? 'http://localhost:1234/schema/deref/project.json'
+      : 'https://schema.opencrypto.io/build/deref/project.json'
+    Promise.all([
+      ocd.query('webids'),
+      m.request(schemaUrl)
+    ]).then(out => {
+      webIds = out[0]
+      projectSchema = fixSchema(out[1])
+      m.redraw()
     })
   },
   view (vnode) {
@@ -210,9 +367,12 @@ const Layout = {
             ])
           ])
         ]),
-        m('.container', [
-          m('#page', vnode.children)
-        ])
+        m('.container', function() {
+          if (webIds && projectSchema) {
+            return m('#page', vnode.children)
+          }
+          return m('div', { style: 'padding: 2em;' }, 'Loading ..')
+        }())
       ])
     ])
   }
@@ -319,32 +479,25 @@ const ProjectList = {
 }
 
 var dataItem = null
-var projectSchema = null
 var dataView = 'explorer'
 
 const Project = {
   oninit (vnode) {
     ocd.get('project', vnode.attrs.id).then(res => {
-      dataItem = res
+      dataItem = processItem(res)
       m.redraw()
     })
-    if (!projectSchema) {
-      m.request('https://schema.opencrypto.io/build/deref/project.json').then(res => {
-        projectSchema = res
-        m.redraw()
-      })
-    }
   },
   view (vnode) {
     if (!dataItem) {
       return m('div', { style: 'padding: 2em;' }, 'Loading ..')
     }
-    const p = processItem(dataItem)
 
     function switchSource (type) {
       console.log(type)
       dataView = type
     }
+    const p = dataItem
 
     return m('div', [
       m('h2.title.is-4', [
