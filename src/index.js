@@ -426,7 +426,7 @@ const ProjectList = {
     runSort()
 
     return m('div', [
-      m('.navbar.transparent.listNavBar', [
+      m('.navbar.transparent.pageNavBar', [
         m('.navbar-menu', [
           m('.navbar-start', [
             m('.navbar-item', [
@@ -500,10 +500,18 @@ const Project = {
     const p = dataItem
 
     return m('div', [
-      m('h2.title.is-4', [
-        m('a', { href: '/', oncreate: m.route.link }, 'Projects'),
-        ' / ',
-        m('span', p.name)
+      m('.navbar.transparent.pageNavBar', [
+        m('.navbar-menu', [
+          m('.navbar-start', [
+            m('.navbar-item', [
+              m('h2.title.is-4', [
+                m('a', { href: '/', oncreate: m.route.link }, 'Projects'),
+                ' / ',
+                m('span', p.name)
+              ])
+            ])
+          ])
+        ])
       ]),
       m('#itemDetail', [
         m('.navbar.transparent', [

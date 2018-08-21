@@ -7,8 +7,13 @@ body {
   background-color: transparent;
 }
 
-.navbar.listNavBar {
-  padding-bottom: 1em;
+.navbar.pageNavBar {
+  padding-bottom: 0.5em;
+  min-height: 4em;
+}
+
+.navbar.pageNavBar .navbar-start > .navbar-item:first-child {
+  padding-left: 0;
 }
 
 
@@ -156,7 +161,7 @@ h2.title.is-4 a {
 }
 
 #page {
-  padding-top: 2em;
+  padding-top: 1em;
 }
 
 #logo-text { 

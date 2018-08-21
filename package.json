@@ -5,7 +5,7 @@
   "main": "index.js",
   "scripts": {
     "build": "rm -rf docs && parcel build src/index.html -d docs && cp -r src/public/** docs",
-    "watch": "parcel src/index.html -d docs"
+    "watch": "parcel src/index.html"
   },
   "author": "",
   "license": "ISC",
