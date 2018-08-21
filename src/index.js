@@ -205,7 +205,28 @@ function processItem(i) {
   i._logo = null
   i._logo_full = null
   const [ progress, msgs ] = calculateProgress(projectSchema, i)
-  console.log(i.id, progress, JSON.stringify(msgs, null, 2))
+  i._counts = function () {
+    const types = [
+      { id: 'assets', ico: 'database' },
+      { id: 'networks', ico: 'plug' },
+      { id: 'clients', ico: 'cog' },
+      { id: 'exchanges', ico: 'exchange-alt' }
+    ]
+    let out = []
+    Object.keys(types).forEach((t) => {
+      const tc = types[t]
+      if (i[tc.id] && i[tc.id].length > 0) {
+        tc.count = i[tc.id].length
+        out.push(tc)
+      }
+    })
+    return out.map((o) => {
+      return m('div', { style: 'display:inline-block; padding-right: 1em;' }, [
+        m('i.fa', { class: 'fa-'+o.ico, style: 'color: grey', alt: o.id, title: o.id }),
+        m('span', { style: 'padding-left: 0.5em;' }, o.count)
+      ])
+    })
+  }()
   i._progress = progress
   for(let n = 0; n <= 3; n++) {
     var asset0 = i.assets[n]
@@ -444,7 +465,7 @@ const ProjectList = {
             m('tr', [
               m('th', ''),
               m('th', m('a', { onclick: m.withAttr('value', updateSort), value: 'name' }, 'Name')),
-              m('th', 'Project tags'),
+              m('th', 'Includes'),
               m('th', m('a', { onclick: m.withAttr('value', updateSort), value: '_progress' }, 'Completeness')),
               m('th', m('a', { onclick: m.withAttr('value', updateSort), value: '_size' }, 'Data size')),
               m('th', 'GitHub'),
@@ -458,7 +479,7 @@ const ProjectList = {
                   i._logo ? m('img', { src: 'data:image/svg+xml;base64,' + i._logo }) : '',
                 ])),
                 m('td', m('a.projectTitle', { href: '/project/'+i.id, oncreate: m.route.link }, i.name)),
-                m('td', i.tags ? i.tags.join(', ') : ''),
+                m('td', i._counts),
                 m('td', m('div', [
                   m('progress.progress.is-primary.is-small', { value: i._progress, max: 1 }, `${i._progress}%`) 
                 ])),
