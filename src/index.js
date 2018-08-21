@@ -552,7 +552,6 @@ const Project = {
 }
 
 const root = document.getElementById('data-explorer')
-m.route.prefix('')
 m.route(root, '/', {
   '/': { render: () => m(Layout, m(ProjectList)) },
   '/project/:id': { render: (vnode) => m(Layout, m(Project, vnode.attrs)) }
