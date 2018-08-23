@@ -7,15 +7,11 @@ body {
   background-color: transparent;
 }
 
-.navbar.pageNavBar {
-  padding-bottom: 0.5em;
-  min-height: 4em;
+.level.pageNavBar {
+  padding-top: 0.5em;
+  padding-bottom: 0.1em;
+  min-height: 3em;
 }
-
-.navbar.pageNavBar .navbar-start > .navbar-item:first-child {
-  padding-left: 0;
-}
-
 
 #navbar {
   padding: 0.7rem 0;
@@ -44,6 +40,11 @@ a.navbar-item:hover, a:hover {
   max-height: 25px;
   display: block;
   margin: auto;
+}
+
+#itemDetail > .level {
+  padding: 1.5em;
+  margin-bottom: 0;
 }
 
 #itemDetail {
@@ -222,5 +223,13 @@ input.searchInput:focus {
   font-size: 0.9em;
   z-index: 1;
   border-top: 1px solid #D1D1D1;
+}
+
+.box.subitem {
+  margin-bottom: 0.2em;
+}
+
+td > .box.subitem:last-child {
+  margin-bottom: 0;
 }
 

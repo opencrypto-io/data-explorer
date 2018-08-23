@@ -3,57 +3,119 @@ var hideEmpty = true
 var webIds = null
 var path = null
 var projectSchema = null
+var state = {
+  expanded: []
+}
+
+const models = {
+  project: {
+    id: 'project',
+    title: 'Project',
+    plural: 'Projects',
+    collection: 'projects',
+    root: null,
+    path: 'projects',
+    schemapath: null
+  },
+  ledger: {
+    id: 'ledger',
+    title: 'Ledger',
+    plural: 'Ledgers',
+    collection: 'ledgers',
+    root: 'project',
+    path: 'projects[].ledgers[]',
+    schemapath: 'properties.ledgers.items'
+  },
+  network: {
+    id: 'network',
+    title: 'Network',
+    plural: 'Networks',
+    collection: 'networks',
+    root: 'asset',
+    path: 'projects[].ledgers[].networks[]',
+    schemapath: 'properties.ledgers.items.properties.networks.items'
+  },
+  asset: {
+    id: 'asset',
+    title: 'Asset',
+    plural: 'Assets',
+    collection: 'assets',
+    root: 'project',
+    path: 'projects[].assets[]',
+    schemapath: 'properties.assets.items'
+  },
+  client: {
+    id: 'client',
+    title: 'Client',
+    plural: 'Clients',
+    collection: 'clients',
+    root: 'project',
+    path: 'projects[].clients[]',
+    schemapath: 'properties.clients.items'
+  },
+  exchange: {
+    id: 'exchange',
+    title: 'Exchange',
+    plural: 'Exchanges',
+    collection: 'exchanges',
+    root: 'project',
+    path: 'projects[].exchanges[]',
+    schemapath: 'properties.exchanges.items'
+  }
+}
 
 const wcol = 'opencrypto-weight'
 const wcolif = 'opencrypto-weight-if'
+const wcolmin = 'opencrypto-weight-min'
 
-function fixSchema (schema) {
-  return schema
+const ocdx = new ocd.Client({ dataUrl: 
+    schemaUrl = window.location.hostname === 'localhost'
+      ? '/data/data.json'
+      : 'https://data.opencrypto.io/data.json'
+ })
 
-  schema.properties.name[wcol] = 1
-  schema.properties.start_date[wcol] = 1
-  schema.properties.web[wcol] = 1
-  schema.properties.history[wcol] = 1
-  schema.properties.whitepapers[wcol] = 1
-  schema.properties.contacts[wcol] = 1
-  schema.properties.images[wcol] = 1
-  //schema.properties.images.properties.logo_square[wcol] = 1
+function getCounts(i, root = 'project') {
+  let types = []
+  const submods = _.findKey(models, { root })
+  console.log(root, submods)
+  switch (root) {
+    case 'project':
+      types = [
+        { id: 'ledgers', ico: 'database' },
+        { id: 'assets', ico: 'dollar-sign' },
+        { id: 'exchanges', ico: 'exchange-alt' },
+        { id: 'clients', ico: 'cog' },
+      ]
+      break
+    case 'ledger':
+      types = [
+        { id: 'networks', ico: 'plug' }
+      ]
+  }
+  let out = []
+  Object.keys(types).forEach((t) => {
+    const tc = types[t]
+    if (i[tc.id] && i[tc.id].length > 0) {
+      tc.count = i[tc.id].length
+      out.push(tc)
+    }
+  })
+  return out.map((o) => {
+    return m('div', { style: 'display:inline-block; padding-right: 1em;' }, [
+      m('i.fa', { class: 'fa-'+o.ico, style: 'color: grey', alt: o.id, title: o.id }),
+      m('span', { style: 'padding-left: 0.5em;' }, o.count)
+    ])
+  })
+}
 
-  schema.properties.team[wcol] = 1
-  schema.properties.team_url[wcol] = 0.5
-  schema.properties.team.items.properties.name[wcol] = 1
-  schema.properties.team.items.properties.role[wcol] = 1
-  schema.properties.team.items.properties.photo[wcol] = 0.5
-  schema.properties.team.items.properties.webids[wcol] = 1
-
-  schema.properties.assets[wcol] = 1
-  schema.properties.webids[wcol] = 1
-  //schema.properties.assets.items[wcol] = 2
-  schema.properties.assets.items.properties.start_date[wcol] = 1
-  schema.properties.assets.items.properties.type[wcol] = 1
-  schema.properties.assets.items.properties.symbol[wcol] = 1
-  schema.properties.assets.items.properties.name[wcol] = 1
-  schema.properties.assets.items.properties.denominations[wcol] = 1
-  schema.properties.assets.items.properties.token_properties[wcol] = 1
-  schema.properties.assets.items.properties.images[wcol] = 1
-  schema.properties.assets.items.properties.networks[wcol] = 1
-  schema.properties.assets.items.properties.networks[wcolif] = 'root.type === "blockchain"'
-
-  let network = schema.properties.assets.items.properties.networks.items
-  network.properties.name[wcol] = 5
-  network.properties.type[wcol] = 5
-  network.properties.proof_type[wcol] = 0.5
-  network.properties.proof_type[wcolif] = 'root.type === "main"'
-  network.properties.algorithm[wcol] = 1
-  network.properties.algorithm[wcolif] = 'root.type === "main"'
-  network.properties.target_block_time[wcol] = 1
-  network.properties.target_block_time[wcolif] = 'root.type === "main"'
-  network.properties.maximum_block_size[wcol] = 1
-  network.properties.maximum_block_size[wcolif] = 'root.type === "main"'
-  network.properties.mineable[wcol] = 1
-  network.properties.mineable[wcolif] = 'root.type === "main"'
-
-  return schema
+function expandSubschema (val) {
+  if (state.expanded.indexOf(val) !== -1) {
+    state.expanded.splice(state.expanded.indexOf(val), 1)
+    console.log('de-expanded: ', val, state.expanded)
+  } else {
+    state.expanded.push(val)
+    console.log('expanded: ', val, state.expanded)
+  }
 }
 
 function progressError(msgs, path, weight=1, text=undefined) {
@@ -77,7 +139,7 @@ function calculateProgress (schema, obj, path=[], msgs=[], root=null) {
     case 'boolean':
       if (schema[wcol]) {
         if (schema[wcolif]) {
-          console.log('exception: %s, eval="%s"', makePath(path), schema[wcolif])
+          //console.log('exception: %s, eval="%s"', makePath(path), schema[wcolif])
           const ret = function test(code) {
             return eval(code)
           }(schema[wcolif])
@@ -94,8 +156,13 @@ function calculateProgress (schema, obj, path=[], msgs=[], root=null) {
       break
     case 'array':
       if (schema[wcol] && schema.items) {
+        //console.log(obj, obj.length, schema[wcolmin])
+        if (((obj && obj.length == 0) || !obj) && schema[wcolmin] == 0) {
+          w = 1
+          break
+        }
         if (schema[wcolif]) {
-          console.log('exception: %s, eval="%s"', makePath(path), schema[wcolif])
+          //console.log('exception: %s, eval="%s"', makePath(path), schema[wcolif])
           const ret = function test(code) {
             return eval(code)
           }(schema[wcolif])
@@ -119,7 +186,7 @@ function calculateProgress (schema, obj, path=[], msgs=[], root=null) {
     case 'object':
       if (schema.properties) {
         if (schema[wcol] && schema[wcolif]) {
-          console.log('exception: %s, eval="%s"', makePath(path), schema[wcolif])
+          //console.log('exception: %s, eval="%s"', makePath(path), schema[wcolif])
           const ret = function test(code) {
             return eval(code)
           }(schema[wcolif])
@@ -134,7 +201,7 @@ function calculateProgress (schema, obj, path=[], msgs=[], root=null) {
           let pd = schema.properties[p]
           if (pd[wcol]) {
             weights[p] = pd[wcol]
-            const [ prog ] = calculateProgress(pd, obj[p] || '', path.concat([p]), msgs, obj)
+            const [ prog ] = calculateProgress(pd, obj ? obj[p] : null, path.concat([p]), msgs, obj)
             progress[p] = prog
           }
         })
@@ -200,37 +267,42 @@ function resolveWebId(val, type) {
   return m('a', { href, target: '_blank' }, val)
 }
 
-function processItem(i) {
-  i._size = getLengthInBytes(JSON.stringify(i))
+function processItem(i, type = 'project') {
+  i._size = getLengthInBytes(JSON.stringify(_.pickBy(i, (value, key) => {
+    return !key.match(/^_/)
+  })))
   i._logo = null
   i._logo_full = null
   const [ progress, msgs ] = calculateProgress(projectSchema, i)
-  i._counts = function () {
-    const types = [
-      { id: 'assets', ico: 'database' },
-      { id: 'networks', ico: 'plug' },
-      { id: 'clients', ico: 'cog' },
-      { id: 'exchanges', ico: 'exchange-alt' }
-    ]
-    let out = []
-    Object.keys(types).forEach((t) => {
-      const tc = types[t]
-      if (i[tc.id] && i[tc.id].length > 0) {
-        tc.count = i[tc.id].length
-        out.push(tc)
-      }
-    })
-    return out.map((o) => {
-      return m('div', { style: 'display:inline-block; padding-right: 1em;' }, [
-        m('i.fa', { class: 'fa-'+o.ico, style: 'color: grey', alt: o.id, title: o.id }),
-        m('span', { style: 'padding-left: 0.5em;' }, o.count)
-      ])
-    })
-  }()
+  //console.log(JSON.stringify(msgs, null, 2))
+  i._counts = getCounts(i, type)
   i._progress = progress
-  for(let n = 0; n <= 3; n++) {
+  const baseCols = [ '@', 'assets', 'exchanges', 'clients', 'apps', 'blockchains' ]
+  baseCols.forEach(c => {
+    if (i._logo) return null
+    let ic = i[c] 
+    if (c === '@') {
+      ic = [i]
+    }
+    if (ic && ic.length > 0) {
+      ic.forEach(ci => {
+        if (i._logo || !ci.images) return null
+        if (ci.images.logo_square) {
+          i._logo = ci.images.logo_square.data
+        }
+        if (ci.images.logo_full) {
+          i._logo_full = ci.images.logo_full.data
+          if (!i._logo) {
+            i._logo = i._logo_full
+          }
+        } else if (ci.images.logo_square) {
+          i._logo_full = ci.images.logo_square.data
+        }
+      })
+    }
+  })
+  /*for(let n = 0; n <= 3; n++) {
     var asset0 = i.assets[n]
-    if (i._logo) continue
     if (!asset0) continue
     if (asset0.images && asset0.images.logo_square) {
       i._logo = asset0.images.logo_square.data
@@ -239,7 +311,7 @@ function processItem(i) {
     if (asset0.images && asset0.images.logo_full) {
       i._logo_full = asset0.images.logo_full.data
     }
-  }
+  }*/
   return i
 }
 
@@ -273,10 +345,11 @@ function OCBoolean (schema, val) {
   return val === true ? 'Yes' : (val === false ? 'No' : zeroValue())
 }
 
-function OCString (schema, val, path) {
-  if (!val) {
+function OCString (schema, val, path, root) {
+  if (val === undefined || val === null) {
     return zeroValue()
   }
+  let cpath = path[path.length-1]
   if (schema.media && schema.media.binaryEncoding == 'base64') {
     return m('div', [
       m('img', { src: 'data:image/svg+xml;base64,' + val, style: 'max-height: 100px;' }) 
@@ -292,6 +365,25 @@ function OCString (schema, val, path) {
   else if (schema.format == 'webid') {
     out = resolveWebId(val, path.slice(-1)[0])
   }
+  if (cpath === 'contract_address') {
+    if (root.blockchain === 'ethereum') {
+      out = m('a', { href: `https://etherscan.io/address/${val}`, target: '_blank' }, val)
+    }
+  }
+  else if (cpath === 'market_id') {
+    let lnk = null
+    switch (root.platform) {
+      case 'ios':
+        lnk = `http://itunes.apple.com/gb/app/${val}`
+        break
+      case 'android':
+        lnk = `https://play.google.com/store/apps/details?id=${val}`
+        break
+    }
+    if (lnk) {
+      out = m('a', { href: lnk, target: '_blank' }, val)
+    }
+  }
   return m('div', [
     out,
     m('.control', m('a', { href: githubIssueLink(path, val) }, m('i.fas.fa-bug')))
@@ -302,17 +394,18 @@ function OCNumber (schema, val) {
   return val || zeroValue()
 }
 
-function OCArray (schema, val, path) {
+function OCArray (schema, val, path, root) {
   if (!val || val.length === 0) {
     return zeroValue()
   }
   let fn = getType(schema.items.type)
   return val.map((i, c) => {
-    return fn ? fn(schema.items, i, path.concat([c])) : null
+    return fn ? fn(schema.items, i, path.concat([c]), root) : null
   })
 }
 
-function OCObject(schema, values, path) {
+function OCObject(schema, values, path, root=null) {
+  let wrapper = (out) => out
   if (schema.patternProperties) {
     if (values) {
       schema.properties = []
@@ -326,8 +419,52 @@ function OCObject(schema, values, path) {
   if (!schema.properties) {
     return m('div', 'bad object')
   }
-  return m('table.table', m('tbody', Object.keys(schema.properties).map(p => {
-    if (hideEmpty && !values[p]) {
+  if (schema.$id && path.length > 0) {
+    wrapper = (res) => {
+      const match = schema.$id.match(/\/models\/([^#]+)#?$/)
+      //console.log(state.expanded, `@@${match[1]}:${values.id}@@`)
+      if (!match) {
+        return res
+      }
+      const schemas = {
+        ledger: projectSchema.properties.ledgers.items,
+        asset: projectSchema.properties.assets.items,
+        exchange: projectSchema.properties.exchanges.items,
+        client: projectSchema.properties.clients.items,
+        network: projectSchema.properties.ledgers.items.properties.networks.items,
+        market: projectSchema.properties.exchanges.items.properties.markets.items,
+      }
+      const subschemaId = match[1]
+      const expanded = state.expanded.indexOf(`${match[1]}:${values.id}`) !== -1
+      if (!schemas[subschemaId]) {
+        console.log('not exists: %s', subschemaId)
+      }
+      const [ progress, msgs ] = calculateProgress(schemas[subschemaId], values)
+
+      const content = m('.box.subitem', [
+        m('nav.level', [
+          m('.level-left', [
+            m('.level-item', m('a', { href: `/${subschemaId}/${values.pid || values.id}`, oncreate: m.route.link }, m('b', values.name))),
+            m('.level-item', `[${values.id}]`),
+          ]),
+          m('.level-right', [
+            m('.level-item', [
+              getCounts(values, subschemaId),
+            ]),
+            m('.level-item', { style: 'color: black; width: 10em;' }, [
+              m('span', { style: 'padding-right: 1em; font-size: 0.9em;' }, (progress*100).toFixed(0) + '%'),
+              m('progress.progress.is-primary.is-small', { value: progress, max: 1 }, `${progress}%`) 
+            ]),
+            m('.level-item', m('a', { onclick: m.withAttr('value', expandSubschema), value: `${subschemaId}:${values.id}` }, expanded ? 'Collapse' : 'Expand'))
+          ])
+        ]),
+        expanded ? m('div', res) : null
+      ])
+      return content
+    }
+  }
+  return wrapper(m('table.table', m('tbody', Object.keys(schema.properties).map(p => {
+    if (hideEmpty && (values[p] === undefined || values[p] === null)) {
       return null
     }
     const pdata = schema.properties[p]
@@ -336,9 +473,9 @@ function OCObject(schema, values, path) {
     let events = { 'data-path': makeFooter(cpath, pdata), onmouseenter: m.withAttr('data-path', setPath), onmouseleave: m.withAttr('data-path', unsetPath) }
     return m('tr', events, [
       m('th', pdata.title || p),
-      m('td', fn ? fn(pdata, values ? values[p] : null, cpath) : 'unknown type: '+pdata.type)
+      m('td', fn ? fn(pdata, values ? values[p] : null, cpath, values) : 'unknown type: '+pdata.type)
     ])
-  })))
+  }))))
 }
 
 function githubLink(id, type = 'blob') {
@@ -351,11 +488,11 @@ const Layout = {
       ? 'http://localhost:1234/schema/deref/project.json'
       : 'https://schema.opencrypto.io/build/deref/project.json'
     Promise.all([
-      ocd.query('webids'),
+      ocdx.query('webids'),
       m.request(schemaUrl)
     ]).then(out => {
       webIds = out[0]
-      projectSchema = fixSchema(out[1])
+      projectSchema = out[1]
       m.redraw()
     })
   },
@@ -400,22 +537,51 @@ const Layout = {
 }
 
 var originalData = null
+var projectData = null
 var data = null
 var sortBy = 'name'
 var sortReverse = false
+var listModel = null
+var listModelAttr = null
+var modelData = null
+var defaultList = 'projects'
+
+function loadListData (vnode) {
+  let model = modelData = _.find(models, { collection: vnode.attrs.type || defaultList })
+  if (!modelData) {
+    console.error('no model: %s', model)
+  }
+
+  listModel = model
+  listModelAttr = model.collection
+  ocdx.query(modelData.path).then(res => {
+    console.log(res)
+    data = res.map(i => {
+      return processItem(i, model.id)
+    })
+    originalData = _.clone(data)
+    m.redraw()
+  })
+}
 
 const ProjectList = {
-  oninit () {
-    ocd.query('projects').then(res => {
-      data = res.map(i => {
-        return processItem(i)
+  oninit (vnode) {
+    loadListData(vnode)
+    if (projectData === null) {
+      ocdx.query('projects').then((pd) => {
+        projectData = _.clone(pd)
+        m.redraw()
       })
-      originalData = _.clone(data)
-      m.redraw()
-    })
+    }
+  },
+  onupdate (vnode) {
+    console.log(vnode.attrs)
+    if (listModelAttr !== (vnode.attrs.type || defaultList)) {
+      loadListData(vnode)
+    }
   },
   view () {
-    if (data === null) {
+    if (data === null || projectData === null) {
       return m('div', { style: 'padding: 2em;' }, 'Loading ..')
     }
 
@@ -447,22 +613,35 @@ const ProjectList = {
     runSort()
 
     return m('div', [
-      m('.navbar.transparent.pageNavBar', [
-        m('.navbar-menu', [
-          m('.navbar-start', [
-            m('.navbar-item', [
-              m('h2.title.is-4', 'Projects ('+originalData.length+')'),
-            ]),
-            m('.navbar-item', [
-              m('input.searchInput', { placeholder: 'Search projects ..', oninput: m.withAttr('value', searchList) }),
-            ])
+      m('nav.level.pageNavBar', [
+        m('.level-left', [
+          m('.level-item', [
+            m('h2.title.is-4', `${modelData.plural} (${originalData.length})`),
+          ]),
+          m('.level-item', [
+            m('input.searchInput', { placeholder: `Search ${modelData.plural.toLowerCase()} ..`, oninput: m.withAttr('value', searchList) }),
           ])
+        ]),
+        m('.level-right', [
+          m('.level-item', m('.buttons.has-addons', Object.keys(models).map((mid) => {
+            const model = models[mid]
+            var classAttr = null
+            if (modelData.id === model.id) {
+              classAttr = 'is-selected is-info'
+            }
+            return m('span.level-item.button', { 
+              href: `/${model.collection}`,
+              oncreate: m.route.link,
+              class: (modelData.id === model.id) ? 'is-selected is-warning' : ''
+            }, model.plural)
+          })))
         ])
       ]),
       m('#projectList', [
         m('table.table', [
           m('thead', [
             m('tr', [
+              modelData.id !== 'project' ? m('th', 'Project') : null,
               m('th', ''),
               m('th', m('a', { onclick: m.withAttr('value', updateSort), value: 'name' }, 'Name')),
               m('th', 'Includes'),
@@ -474,11 +653,22 @@ const ProjectList = {
           ]),
           m('tbody', function () {
             return data.map(i => {
+              const detailLink = `/${modelData.id}/${i.pid || i.id}`
               return m('tr', { key: i.id }, [
+                modelData.id !== 'project' ? 
+                  m('td', function () {
+                    if (!i.pid) {
+                      return m('span', 'n/a')
+                    }
+                    const pi = i.pid.split(':')[0]
+                    const par = _.find(projectData, { id: pi })
+                    return m('a', { href: '/project/'+pi, oncreate: m.route.link }, par.name)
+                  }())
+                  : null,
                 m('td.data-logo', m('div', [
                   i._logo ? m('img', { src: 'data:image/svg+xml;base64,' + i._logo }) : '',
                 ])),
-                m('td', m('a.projectTitle', { href: '/project/'+i.id, oncreate: m.route.link }, i.name)),
+                m('td', m('a.projectTitle', { href: detailLink, oncreate: m.route.link }, i.name)),
                 m('td', i._counts),
                 m('td', m('div', [
                   m('progress.progress.is-primary.is-small', { value: i._progress, max: 1 }, `${i._progress}%`) 
@@ -489,7 +679,7 @@ const ProjectList = {
                   ', ',
                   m('a', { href: githubLink(i.id, 'edit') }, 'Edit'),
                 ]),
-                m('td', m('a', { href: '/project/'+i.id, oncreate: m.route.link }, 'View →' )),
+                m('td', m('a', { href: detailLink, oncreate: m.route.link }, 'View →' )),
               ])
             })
           }())
@@ -501,56 +691,72 @@ const ProjectList = {
 
 var dataItem = null
 var dataView = 'explorer'
+var dataObject = null
+var detailId = null
+
+function loadItem (vnode) {
+  state.expanded = []
+  console.log(vnode.attrs)
+  const type = vnode.attrs.type
+  let id = vnode.attrs.id 
+  if (vnode.attrs.subid) {
+    id = [ id, vnode.attrs.subid ].join(':')
+  }
+  ocdx.get(type, id).then(res => {
+    dataItem = processItem(res, type)
+    detailId = [ vnode.attrs.type, vnode.attrs.id, vnode.attrs.subid ].join('-')  
+    m.redraw()
+  })
+}
 
 const Project = {
   oninit (vnode) {
-    ocd.get('project', vnode.attrs.id).then(res => {
-      dataItem = processItem(res)
-      m.redraw()
-    })
+    loadItem(vnode)
+  },
+  onupdate (vnode) {
+    const id = [ vnode.attrs.type, vnode.attrs.id, vnode.attrs.subid ].join('-') 
+    if (detailId !== id) {
+      loadItem(vnode)
+    }
   },
   view (vnode) {
     if (!dataItem) {
       return m('div', { style: 'padding: 2em;' }, 'Loading ..')
     }
-
     function switchSource (type) {
-      console.log(type)
       dataView = type
     }
     const p = dataItem
+    const model = models[vnode.attrs.type]
 
     return m('div', [
-      m('.navbar.transparent.pageNavBar', [
-        m('.navbar-menu', [
-          m('.navbar-start', [
-            m('.navbar-item', [
-              m('h2.title.is-4', [
-                m('a', { href: '/', oncreate: m.route.link }, 'Projects'),
-                ' / ',
-                m('span', p.name)
-              ])
+      m('nav.level.pageNavBar', [
+        m('.level-left', [
+          m('.level-item', [
+            m('h2.title.is-4', [
+              m('a', { href: `/${model.collection}`, oncreate: m.route.link }, model.title),
+              ' / ',
+              m('span', p.name)
             ])
           ])
         ])
       ]),
       m('#itemDetail', [
-        m('.navbar.transparent', [
-          m('.navbar-menu', [
-            m('.navbar-start', [
-              p._logo_full ? m('.navbar-item', m('.itemLogo', m('img', { src: 'data:image/svg+xml;base64,' + p._logo_full }))) : '',
-              m('.navbar-item', m('h3.title.is-4', p.name))
+        m('.level', [
+          m('.level-left', [
+            p._logo_full ? m('.navbar-item', m('.itemLogo', m('img', { src: 'data:image/svg+xml;base64,' + p._logo_full }))) : '',
+            m('.navbar-item', m('h3.title.is-4', p.name))
+          ]),
+          m('.level-right', [
+            m('.level-item', p._counts),
+            m('a.level-item', { href: githubLink(p.id, 'edit') }, [
+              m('i.fab.fa-github', { style: 'font-size: 1.3em; padding-right: 0.3em;' }),
+              'Edit on GitHub'
             ]),
-            m('.navbar-end', [
-              m('a.navbar-item', { href: githubLink(p.id, 'edit') }, [
-                m('i.fab.fa-github', { style: 'font-size: 1.3em; padding-right: 0.3em;' }),
-                'Edit on GitHub'
-              ]),
-              m('.navbar-item', [
-                m('.buttons.has-addons', [
-                  m('span.button', { class: dataView === 'explorer' ? 'is-success is-selected' : '', onclick: m.withAttr('value', switchSource), value: 'explorer' }, 'Explorer'),
-                  m('span.button', { class: dataView === 'source' ? 'is-success is-selected' : '', onclick: m.withAttr('value', switchSource), value: 'source' }, 'Source'),
-                ])
+            m('.level-item', [
+              m('.buttons.has-addons', [
+                m('span.button', { class: dataView === 'explorer' ? 'is-success is-selected' : '', onclick: m.withAttr('value', switchSource), value: 'explorer' }, 'Explorer'),
+                m('span.button', { class: dataView === 'source' ? 'is-success is-selected' : '', onclick: m.withAttr('value', switchSource), value: 'source' }, 'Source'),
               ])
             ])
           ])
@@ -565,7 +771,9 @@ const Project = {
           if (projectSchema === null) {
             return m('div', { style: 'padding: 2em;' }, 'Loading ..')
           }
-          return m('#dataTable', OCObject(projectSchema, p, []))
+          const schema = model.schemapath ? jmespath.search(projectSchema, model.schemapath) : projectSchema
+          dataObject = OCObject(schema, dataItem, [])
+          return m('#dataTable', dataObject)
         }()
       ]),
     ])
@@ -575,5 +783,6 @@ const Project = {
 const root = document.getElementById('data-explorer')
 m.route(root, '/', {
   '/': { render: () => m(Layout, m(ProjectList)) },
-  '/project/:id': { render: (vnode) => m(Layout, m(Project, vnode.attrs)) }
+  '/:type': { render: (vnode) => m(Layout, m(ProjectList, vnode.attrs)) },
+  '/:type/:id': { render: (vnode) => m(Layout, m(Project, vnode.attrs)) }
 })
