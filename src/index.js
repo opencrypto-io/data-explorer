@@ -1,7 +1,7 @@
 
 var hideEmpty = true
 var webIds = null
-var path = null
+var currentPath = null
 var projectSchema = null
 var state = {
   expanded: []
@@ -15,6 +15,7 @@ const models = {
     collection: 'projects',
     root: null,
     path: 'projects',
+    pathx: [ 'project' ],
     schemapath: null
   },
   ledger: {
@@ -24,6 +25,7 @@ const models = {
     collection: 'ledgers',
     root: 'project',
     path: 'projects[].ledgers[]',
+    pathx: [ 'project', 'ledger' ],
     schemapath: 'properties.ledgers.items'
   },
   network: {
@@ -33,6 +35,7 @@ const models = {
     collection: 'networks',
     root: 'asset',
     path: 'projects[].ledgers[].networks[]',
+    pathx: [ 'project', 'ledger', 'network' ],
     schemapath: 'properties.ledgers.items.properties.networks.items'
   },
   asset: {
@@ -42,6 +45,7 @@ const models = {
     collection: 'assets',
     root: 'project',
     path: 'projects[].assets[]',
+    pathx: [ 'project', 'asset' ],
     schemapath: 'properties.assets.items'
   },
   client: {
@@ -51,6 +55,7 @@ const models = {
     collection: 'clients',
     root: 'project',
     path: 'projects[].clients[]',
+    pathx: [ 'project', 'client' ],
     schemapath: 'properties.clients.items'
   },
   exchange: {
@@ -60,6 +65,7 @@ const models = {
     collection: 'exchanges',
     root: 'project',
     path: 'projects[].exchanges[]',
+    pathx: [ 'project', 'exchange' ],
     schemapath: 'properties.exchanges.items'
   }
 }
@@ -77,7 +83,6 @@ const ocdx = new ocd.Client({ dataUrl:
 function getCounts(i, root = 'project') {
   let types = []
   const submods = _.findKey(models, { root })
-  console.log(root, submods)
   switch (root) {
     case 'project':
       types = [
@@ -132,14 +137,12 @@ function checkWeightIf (schema) {
 
 function calculateProgress (schema, obj, path=[], msgs=[], root=null) {
   let w = 1
-  //console.log(schema.title)
   switch (schema.type) {
     case 'string':
     case 'number':
     case 'boolean':
       if (schema[wcol]) {
         if (schema[wcolif]) {
-          //console.log('exception: %s, eval="%s"', makePath(path), schema[wcolif])
           const ret = function test(code) {
             return eval(code)
           }(schema[wcolif])
@@ -156,13 +159,11 @@ function calculateProgress (schema, obj, path=[], msgs=[], root=null) {
       break
     case 'array':
       if (schema[wcol] && schema.items) {
-        //console.log(obj, obj.length, schema[wcolmin])
         if (((obj && obj.length == 0) || !obj) && schema[wcolmin] == 0) {
           w = 1
           break
         }
         if (schema[wcolif]) {
-          //console.log('exception: %s, eval="%s"', makePath(path), schema[wcolif])
           const ret = function test(code) {
             return eval(code)
           }(schema[wcolif])
@@ -186,7 +187,6 @@ function calculateProgress (schema, obj, path=[], msgs=[], root=null) {
     case 'object':
       if (schema.properties) {
         if (schema[wcol] && schema[wcolif]) {
-          //console.log('exception: %s, eval="%s"', makePath(path), schema[wcolif])
           const ret = function test(code) {
             return eval(code)
           }(schema[wcolif])
@@ -232,7 +232,7 @@ function setPath (p) {
   if (!p) {
     return null
   }
-  path = p
+  currentPath = p
 }
 
 function makeFooter (arr, schema) {
@@ -252,7 +252,7 @@ function makePath (arr) {
 }
 
 function unsetPath () {
-  path = null
+  currentPath = null
 }
 
 function resolveWebId(val, type) {
@@ -274,7 +274,6 @@ function processItem(i, type = 'project') {
   i._logo = null
   i._logo_full = null
   const [ progress, msgs ] = calculateProgress(projectSchema, i)
-  //console.log(JSON.stringify(msgs, null, 2))
   i._counts = getCounts(i, type)
   i._progress = progress
   const baseCols = [ '@', 'assets', 'exchanges', 'clients', 'apps', 'blockchains' ]
@@ -422,7 +421,6 @@ function OCObject(schema, values, path, root=null) {
   if (schema.$id && path.length > 0) {
     wrapper = (res) => {
       const match = schema.$id.match(/\/models\/([^#]+)#?$/)
-      //console.log(state.expanded, `@@${match[1]}:${values.id}@@`)
       if (!match) {
         return res
       }
@@ -498,7 +496,7 @@ const Layout = {
   },
   view (vnode) {
     return m('div', [
-      path ? m('#toolsFooter', path) : '',
+      m('#toolsFooter', { style: { display: currentPath ? 'block' : 'none' }}, currentPath),
       m('div', { 'style': 'padding-bottom: 5em;' },  [
         m('nav#navbar.navbar', [
           m('.container', [
@@ -555,7 +553,6 @@ function loadListData (vnode) {
   listModel = model
   listModelAttr = model.collection
   ocdx.query(modelData.path).then(res => {
-    console.log(res)
     data = res.map(i => {
       return processItem(i, model.id)
     })
@@ -575,7 +572,6 @@ const ProjectList = {
     }
   },
   onupdate (vnode) {
-    console.log(vnode.attrs)
     if (listModelAttr !== (vnode.attrs.type || defaultList)) {
       loadListData(vnode)
     }
@@ -696,7 +692,6 @@ var detailId = null
 
 function loadItem (vnode) {
   state.expanded = []
-  console.log(vnode.attrs)
   const type = vnode.attrs.type
   let id = vnode.attrs.id 
   if (vnode.attrs.subid) {
@@ -729,15 +724,29 @@ const Project = {
     const p = dataItem
     const model = models[vnode.attrs.type]
 
+    if (!model) {
+      console.log('Model not found: %s', vnode.attrs.type)
+      return null
+    }
+    
+    if (!model.pathx) {
+      model.pathx = ['project']
+    }
+
     return m('div', [
       m('nav.level.pageNavBar', [
         m('.level-left', [
           m('.level-item', [
-            m('h2.title.is-4', [
-              m('a', { href: `/${model.collection}`, oncreate: m.route.link }, model.title),
-              ' / ',
-              m('span', p.name)
-            ])
+            m('h2.title.is-4', model.pathx.map((mid, i) => {
+              const mod = models[mid]
+              return [ 
+                (i > 0) ? m('span', ' → ') : null,
+                '[',
+                m('a', { href: `/${mod.collection}`, oncreate: m.route.link }, mod.id),
+                '] ',
+                m('a', { href: `/${mod.id}/${(mod.pathx && p.pid) ? p.pid.split(':').slice(0,i+1).join(':') : p.id}`, oncreate: m.route.link }, (model.pathx.length > 1) ? (p.pid ? p.pid.split(':')[i] : p.id) : p.id)
+              ]
+            }))
           ])
         ])
       ]),
