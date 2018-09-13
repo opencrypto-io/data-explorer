@@ -1,14 +1,2 @@
-FROM node:alpine
-
-WORKDIR /corn/data-explorer
-
-COPY package*.json ./
-
-RUN npm ci
-
-COPY . .
-
-EXPOSE 1234
-
-CMD [ "npm", "run-script", "serve" ]
-
+FROM nginx:alpine
+COPY docs /usr/share/nginx/html

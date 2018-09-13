@@ -12,7 +12,7 @@ var branches = [
 ]
 var localBranch = null
 if (window.location.hostname === 'localhost') {
-  branches.push({ id: 'local', url: '/data/data.json', local: true })
+  branches.push({ id: 'local', url: '/data/dist/data.json', local: true })
 }
 var currentBranch = branches[1] || branches[0]
 
@@ -519,7 +519,7 @@ async function changeBranch(branch) {
 
 function loadLayoutData () {
   const schemaUrl = window.location.hostname === 'localhost' 
-    ? 'http://localhost:1234/schema/deref/project.json'
+    ? 'http://localhost:1234/data/schema/build/deref/project.json'
     : 'https://schema.opencrypto.io/build/deref/project.json'
   Promise.all([
     m.request(schemaUrl),
