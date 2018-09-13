@@ -13,6 +13,10 @@ body {
   min-height: 3em;
 }
 
+#subbar {
+  border-bottom: 2px solid silver;
+}
+
 #navbar {
   padding: 0.7rem 0;
   border-bottom: 2px solid #00C718;

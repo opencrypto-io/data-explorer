@@ -1,11 +1,19 @@
 
 var hideEmpty = true
 var webIds = null
+var metadata = null
 var currentPath = null
 var projectSchema = null
 var state = {
   expanded: []
 }
+var branches = [
+  { id: 'master', url: 'https://data.opencrypto.io/data.json' },
+]
+if (window.location.hostname === 'localhost') {
+  branches.push({ id: 'local', url: '/data/data.json', local: true })
+}
+var currentBranch = branches[1] || branches[0]
 
 const models = {
   project: {
@@ -74,11 +82,12 @@ const wcol = 'opencrypto-weight'
 const wcolif = 'opencrypto-weight-if'
 const wcolmin = 'opencrypto-weight-min'
 
-const ocdx = new ocd.Client({ dataUrl: 
-    schemaUrl = window.location.hostname === 'localhost'
-      ? '/data/data.json'
-      : 'https://data.opencrypto.io/data.json'
- })
+var ocdx = loadOCD(currentBranch)
+
+function loadOCD(opts = {}) {
+  console.log('Loading data pack from: %s', opts.url)
+  return new ocd.Client({ dataUrl: opts.url })
+}
 
 function getCounts(i, root = 'project') {
   let types = []
@@ -476,23 +485,51 @@ function OCObject(schema, values, path, root=null) {
   }))))
 }
 
+function githubLinkCommit(commitId) {
+  return `https://github.com/opencrypto-io/data/commit/${commitId}`
+}
+
 function githubLink(id, type = 'blob') {
   return `https://github.com/opencrypto-io/data/${type}/master/db/projects/${id}/project.yaml`
 }
 
+async function changeBranch(branch) {
+  console.log('Switching branch: %s', branch)
+  console.log(branches, branch)
+  currentBranch = _.find(branches, { id: branch })
+  console.log(currentBranch)
+  ocdx = loadOCD(currentBranch)
+  // update list
+  listModelAttr = null
+  // update detail
+  detailId = null
+
+  // update webids & metadata
+  webids = await ocdx.query('webids')
+  metadata = await ocdx.query('metadata')
+
+  m.redraw()
+}
+
+function loadLayoutData () {
+  const schemaUrl = window.location.hostname === 'localhost' 
+    ? 'http://localhost:1234/schema/deref/project.json'
+    : 'https://schema.opencrypto.io/build/deref/project.json'
+  Promise.all([
+    m.request(schemaUrl),
+    ocdx.query('webids'),
+    ocdx.query('metadata'),
+  ]).then(out => {
+    projectSchema = out[0]
+    webIds = out[1]
+    metadata = out[2]
+    m.redraw()
+  })
+}
+
 const Layout = {
   oninit () {
-    const schemaUrl = window.location.hostname === 'localhost' 
-      ? 'http://localhost:1234/schema/deref/project.json'
-      : 'https://schema.opencrypto.io/build/deref/project.json'
-    Promise.all([
-      ocdx.query('webids'),
-      m.request(schemaUrl)
-    ]).then(out => {
-      webIds = out[0]
-      projectSchema = out[1]
-      m.redraw()
-    })
+    loadLayoutData()
   },
   view (vnode) {
     return m('div', [
@@ -520,6 +557,54 @@ const Layout = {
                 m('a.navbar-item', { href: '#' }, 'How to contribute?'), 
                 m('a.navbar-item', { href: '#' }, 'FAQ'), 
               ])
+            ])
+          ])
+        ]),
+        m('nav#subbar.navbar', [
+          m('.container', [
+            m('.navbar-menu', [
+              m('.navbar-start', [
+                m('.navbar-item', m('label', 'Branch:')),
+                m('.navbar-item', [
+                  m('.select.is-rounded', [
+                    m('select', { onchange: m.withAttr('value', changeBranch) }, function () {
+                      return branches.map((b) => m('option', {
+                        selected: currentBranch.id === b.id, 
+                        value: b.id 
+                      }, b.local ? `[local] ${b.id}` : b.id))
+                    }())
+                  ])
+                ]),
+                m('.navbar-item', m('label', 'Commit:')),
+                m('.navbar-item', [
+                  m('.select.is-rounded', [
+                    m('select', [
+                      m('option', 'latest')
+                    ])
+                  ])
+                ])
+              ]),
+              m('.navbar-end', function() {
+                if (!metadata || !metadata.commit) {
+                  return null
+                }
+                let total = null
+                if (metadata.commits_count) {
+                  total = m('.navbar-item', [
+                    '(',
+                    m('a', { href: 'https://github.com/opencrypto-io/data/commits/master' }, '158 commits'),
+                    ')'
+                  ])
+                }
+                return [
+                  m('.navbar-item', [
+                    m('span', { style: 'padding-right: 10px;' }, 'Current commit'),
+                    m('a', { href: githubLinkCommit(metadata.commit) }, m('code', metadata.commit.substring(0,7))),
+                    m('span',{ style: 'padding-left: 10px;'}, '' + moment(metadata.time).fromNow())
+                  ]),
+                  total
+                ]
+              }())
             ])
           ])
         ]),
@@ -552,10 +637,8 @@ function loadListData (vnode) {
 
   listModel = model
   listModelAttr = model.collection
-  ocdx.query(modelData.path).then(res => {
-    data = res.map(i => {
-      return processItem(i, model.id)
-    })
+  ocdx.query(modelData.path).then((res) => {
+    data = res.map(i => processItem(i, model.id))
     originalData = _.clone(data)
     m.redraw()
   })
