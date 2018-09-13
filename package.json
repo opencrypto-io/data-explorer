@@ -7,7 +7,8 @@
     "start": "npm run-script watch",
     "build": "rm -rf docs && parcel build src/index.html -d docs && cp -r src/public/** docs",
     "build-gitadd": "git add docs",
-    "watch": "parcel src/index.html"
+    "watch": "parcel src/index.html",
+    "serve": "parcel serve src/index.html"
   },
   "browserslist": [
     "last 1 Chrome version"
