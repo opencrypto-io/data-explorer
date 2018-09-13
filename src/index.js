@@ -10,6 +10,7 @@ var state = {
 var branches = [
   { id: 'master', url: 'https://data.opencrypto.io/data.json' },
 ]
+var localBranch = null
 if (window.location.hostname === 'localhost') {
   branches.push({ id: 'local', url: '/data/data.json', local: true })
 }
@@ -82,7 +83,8 @@ const wcol = 'opencrypto-weight'
 const wcolif = 'opencrypto-weight-if'
 const wcolmin = 'opencrypto-weight-min'
 
-var ocdx = loadOCD(currentBranch)
+// load basic OCD
+changeBranch(currentBranch.id)
 
 function loadOCD(opts = {}) {
   console.log('Loading data pack from: %s', opts.url)
@@ -494,20 +496,24 @@ function githubLink(id, type = 'blob') {
 }
 
 async function changeBranch(branch) {
-  console.log('Switching branch: %s', branch)
-  console.log(branches, branch)
+  console.log('Loading branch: %s', branch)
+  data = null
+  dataItem = null
+
   currentBranch = _.find(branches, { id: branch })
-  console.log(currentBranch)
   ocdx = loadOCD(currentBranch)
-  // update list
-  listModelAttr = null
-  // update detail
-  detailId = null
 
   // update webids & metadata
   webids = await ocdx.query('webids')
   metadata = await ocdx.query('metadata')
 
+  if (currentBranch.local) {
+    localBranch = metadata.branch
+  }
+  // update list
+  listModelAttr = null
+  // update detail
+  detailId = null
   m.redraw()
 }
 
@@ -564,18 +570,23 @@ const Layout = {
           m('.container', [
             m('.navbar-menu', [
               m('.navbar-start', [
-                m('.navbar-item', m('label', 'Branch:')),
+                m('.navbar-item', m('label', [
+                  //m('i.fas.fa-code-branch', { style: 'padding-right: 10px;' }),
+                  'Branch:',
+                ])),
                 m('.navbar-item', [
                   m('.select.is-rounded', [
                     m('select', { onchange: m.withAttr('value', changeBranch) }, function () {
                       return branches.map((b) => m('option', {
-                        selected: currentBranch.id === b.id, 
-                        value: b.id 
-                      }, b.local ? `[local] ${b.id}` : b.id))
+                        selected: currentBranch.id === b.id, value: b.id 
+                      }, b.local ? `[local] ${localBranch || b.id}` : b.id))
                     }())
                   ])
                 ]),
-                m('.navbar-item', m('label', 'Commit:')),
+                m('.navbar-item', m('label', [
+                  //m('i.fas.fa-code-commit', { style: 'padding-right: 10px;' }),
+                  'Commit:'
+                ])),
                 m('.navbar-item', [
                   m('.select.is-rounded', [
                     m('select', [
@@ -602,7 +613,8 @@ const Layout = {
                     m('a', { href: githubLinkCommit(metadata.commit) }, m('code', metadata.commit.substring(0,7))),
                     m('span',{ style: 'padding-left: 10px;'}, '' + moment(metadata.time).fromNow())
                   ]),
-                  total
+                  total,
+                  m('a.navbar-item', { onclick: m.withAttr('branch', changeBranch), branch: currentBranch.id }, m('i.fas.fa-sync-alt'))
                 ]
               }())
             ])
