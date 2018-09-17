@@ -3,6 +3,13 @@ body {
   background: #F8F8F8;
 }
 
+.green { 
+  color: #00c718;
+}
+.thin {
+  font-weight: 300;
+}
+
 .navbar.transparent {
   background-color: transparent;
 }
@@ -33,6 +40,18 @@ a.navbar-item:hover, a:hover {
 
 #navbar .navbar-item.current {
   font-weight: bold;
+}
+
+#logo-text { 
+  padding-left: 1rem;
+  font-size: 1.4rem;
+  font-weight: 600;
+}
+
+#logo {
+  width: 32px;
+  height: 32px;
+  background-image: url(./opencrypto.svg);
 }
 
 #itemDetail .itemLogo {
@@ -167,25 +186,6 @@ h2.title.is-4 a {
 
 #page {
   padding-top: 1em;
-}
-
-#logo-text { 
-  padding-left: 1rem;
-  font-size: 1.4rem;
-  font-weight: 600;
-}
-
-#logo {
-  width: 32px;
-  height: 32px;
-  background-image: url(./opencrypto.svg);
-}
-
-.green { 
-  color: #00c718;
-}
-.thin {
-  font-weight: 300;
 }
 
 td.data-logo {

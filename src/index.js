@@ -284,6 +284,9 @@ function processItem(i, type = 'project') {
   })))
   i._logo = null
   i._logo_full = null
+  i._logo_type = null
+  i._logo_full_type = null
+
   const [ progress, msgs ] = calculateProgress(projectSchema, i)
   i._counts = getCounts(i, type)
   i._progress = progress
@@ -299,14 +302,18 @@ function processItem(i, type = 'project') {
         if (i._logo || !ci.images) return null
         if (ci.images.logo_square) {
           i._logo = ci.images.logo_square.data
+          i._logo_type = ci.images.logo_square.type
         }
         if (ci.images.logo_full) {
           i._logo_full = ci.images.logo_full.data
+          i._logo_full_type = ci.images.logo_full.type
           if (!i._logo) {
             i._logo = i._logo_full
+            i._logo_type = i._logo_full_type
           }
         } else if (ci.images.logo_square) {
           i._logo_full = ci.images.logo_square.data
+          i._logo_full_type = ci.images.logo_square.type
         }
       })
     }
@@ -355,6 +362,14 @@ function OCBoolean (schema, val) {
   return val === true ? 'Yes' : (val === false ? 'No' : zeroValue())
 }
 
+function getBase64Image (data, type = 'svg') {
+  let ftypes = {
+    svg: 'image/svg+xml',
+    png: 'image/png'
+  }
+  return `data:${ftypes[type]};base64,${data}`
+}
+
 function OCString (schema, val, path, root) {
   if (val === undefined || val === null) {
     return zeroValue()
@@ -362,7 +377,7 @@ function OCString (schema, val, path, root) {
   let cpath = path[path.length-1]
   if (schema.media && schema.media.binaryEncoding == 'base64') {
     return m('div', [
-      m('img', { src: 'data:image/svg+xml;base64,' + val, style: 'max-height: 100px;' }) 
+      m('img', { src: getBase64Image(val, root.type), style: 'max-height: 100px;' }) 
     ])
   }
   let out = val
@@ -757,7 +772,7 @@ const ProjectList = {
                   }())
                   : null,
                 m('td.data-logo', m('div', [
-                  i._logo ? m('img', { src: 'data:image/svg+xml;base64,' + i._logo }) : '',
+                  i._logo ? m('img', { src: getBase64Image(i._logo, i._logo_type) }) : '',
                 ])),
                 m('td', m('a.projectTitle', { href: detailLink, oncreate: m.route.link }, i.name)),
                 m('td', i._counts),
@@ -848,7 +863,7 @@ const Project = {
       m('#itemDetail', [
         m('.level', [
           m('.level-left', [
-            p._logo_full ? m('.navbar-item', m('.itemLogo', m('img', { src: 'data:image/svg+xml;base64,' + p._logo_full }))) : '',
+            p._logo_full ? m('.navbar-item', m('.itemLogo', m('img', { src: getBase64Image(p._logo_full, p._logo_full_type) }))) : '',
             m('.navbar-item', m('h3.title.is-4', p.name))
           ]),
           m('.level-right', [
