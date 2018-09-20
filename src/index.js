@@ -468,7 +468,7 @@ function OCObject(schema, values, path, root=null) {
       const content = m('.box.subitem', [
         m('nav.level', [
           m('.level-left', [
-            m('.level-item', m('a', { href: `/${subschemaId}/${values.pid || values.id}`, oncreate: m.route.link }, m('b', values.name))),
+            m('.level-item', m('a', { href: `/${subschemaId}/${values.pid || values.id}`, oncreate: m.route.linkTop }, m('b', values.name))),
             m('.level-item', `[${values.id}]`),
           ]),
           m('.level-right', [
@@ -737,7 +737,7 @@ const ProjectList = {
             }
             return m('span.level-item.button', { 
               href: `/${model.collection}`,
-              oncreate: m.route.link,
+              oncreate: m.route.linkTop,
               class: (modelData.id === model.id) ? 'is-selected is-warning' : ''
             }, model.plural)
           })))
@@ -768,13 +768,13 @@ const ProjectList = {
                     }
                     const pi = i.pid.split(':')[0]
                     const par = _.find(projectData, { id: pi })
-                    return m('a', { href: '/project/'+pi, oncreate: m.route.link }, par.name)
+                    return m('a', { href: '/project/'+pi, oncreate: m.route.linkTop }, par.name)
                   }())
                   : null,
                 m('td.data-logo', m('div', [
                   i._logo ? m('img', { src: getBase64Image(i._logo, i._logo_type) }) : '',
                 ])),
-                m('td', m('a.projectTitle', { href: detailLink, oncreate: m.route.link }, i.name)),
+                m('td', m('a.projectTitle', { href: detailLink, oncreate: m.route.linkTop }, i.name)),
                 m('td', i._counts),
                 m('td', m('div', [
                   m('progress.progress.is-primary.is-small', { value: i._progress, max: 1 }, `${i._progress}%`) 
@@ -785,7 +785,7 @@ const ProjectList = {
                   ', ',
                   m('a', { href: githubLink(i.id, 'edit') }, 'Edit'),
                 ]),
-                m('td', m('a', { href: detailLink, oncreate: m.route.link }, 'View →' )),
+                m('td', m('a', { href: detailLink, oncreate: m.route.linkTop }, 'View →' )),
               ])
             })
           }())
@@ -852,9 +852,9 @@ const Project = {
               return [ 
                 (i > 0) ? m('span', ' → ') : null,
                 '[',
-                m('a', { href: `/${mod.collection}`, oncreate: m.route.link }, mod.id),
+                m('a', { href: `/${mod.collection}`, oncreate: m.route.linkTop }, mod.id),
                 '] ',
-                m('a', { href: `/${mod.id}/${(mod.pathx && p.pid) ? p.pid.split(':').slice(0,i+1).join(':') : p.id}`, oncreate: m.route.link }, (model.pathx.length > 1) ? (p.pid ? p.pid.split(':')[i] : p.id) : p.id)
+                m('a', { href: `/${mod.id}/${(mod.pathx && p.pid) ? p.pid.split(':').slice(0,i+1).join(':') : p.id}`, oncreate: m.route.linkTop }, (model.pathx.length > 1) ? (p.pid ? p.pid.split(':')[i] : p.id) : p.id)
               ]
             }))
           ])
@@ -898,6 +898,24 @@ const Project = {
     ])
   }
 }
+
+m.route.linkTop = function() {
+  m.route.link.apply(this, arguments)
+}
+
+m.mount(
+  document.createDocumentFragment(),
+  {
+    view: () => '',
+    onupdate() {
+      const route = m.route.get()
+      if (route != this.route) {
+        scrollTo(0, 0)
+      }
+      this.route = route
+    }
+  }
+)
 
 const root = document.getElementById('data-explorer')
 m.route(root, '/', {
