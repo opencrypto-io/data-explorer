@@ -411,7 +411,7 @@ function OCString (schema, val, path, root) {
   }
   return m('div', [
     out,
-    m('.control', m('a', { href: githubIssueLink(path, val) }, m('i.fas.fa-bug')))
+    m('.control', m('a', { href: githubIssueLink(path, val) }, 'Report value'))
   ])
 }
 
@@ -575,8 +575,7 @@ const Layout = {
                 m('a.navbar-item', { href: 'https://schema.opencrypto.io' }, 'Schema'), 
               ]),
               m('.navbar-end', [
-                m('a.navbar-item', { href: '#' }, 'How to contribute?'), 
-                m('a.navbar-item', { href: '#' }, 'FAQ'), 
+                m('a.navbar-item', { href: 'https://data.opencrypto.io/#how-to-use-contribute' }, 'How to contribute?'), 
               ])
             ])
           ])
